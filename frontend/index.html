@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket.Chat Test Client</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 { color: #f39c12; text-align: center; padding: 10px; font-size: 1.2em; background: #16213e; }
+
+        /* Layout */
+        .app-container { display: flex; flex: 1; overflow: hidden; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: #0f3460;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #1a1a2e;
+        }
+        .sidebar-section { padding: 10px; border-bottom: 1px solid #1a1a2e; }
+        .sidebar-section h3 { font-size: 0.8em; color: #888; margin-bottom: 8px; text-transform: uppercase; }
+
+        .user-item, .room-item {
+            padding: 8px 12px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-item:hover, .room-item:hover { background: #16213e; }
+        .room-item.active { background: #e94560; }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+        .status-dot.online { background: #27ae60; }
+
+        /* Main chat area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+        }
+        .chat-header {
+            padding: 15px;
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+            font-weight: bold;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .message {
+            padding: 10px 15px;
+            margin: 8px 0;
+            background: #16213e;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+        .message.own { margin-left: auto; background: #0f3460; border: 1px solid #e94560; }
+        .message .user { color: #f39c12; font-weight: bold; font-size: 0.85em; }
+        .message .time { color: #666; font-size: 0.75em; margin-left: 8px; }
+        .message .text { margin-top: 5px; line-height: 1.4; }
+        .message audio { margin-top: 8px; width: 100%; }
+
+        /* Input area */
+        .input-area {
+            padding: 15px;
+            background: #16213e;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .input-area input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 1em;
+        }
+        .input-area button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn-send { background: #e94560; color: white; }
+        .btn-send:hover { background: #f39c12; }
+        .btn-voice { background: #27ae60; color: white; width: 50px; }
+        .btn-voice:hover { background: #2ecc71; }
+        .btn-voice.recording { background: #e74c3c; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Login overlay */
+        .login-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .login-box {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 300px;
+        }
+        .login-box h2 { margin-bottom: 20px; color: #f39c12; }
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #e94560;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .login-box button:hover { background: #f39c12; }
+
+        /* Status bar */
+        #status-bar {
+            padding: 5px 15px;
+            font-size: 0.8em;
+            background: #0a0a15;
+            color: #666;
+        }
+        #status-bar.connected { color: #27ae60; }
+        #status-bar.error { color: #e74c3c; }
+
+        .hidden { display: none !important; }
+
+        /* Debug panel */
+        .debug-panel {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 350px;
+            max-height: 200px;
+            background: #0a0a15;
+            border: 1px solid #333;
+            font-size: 0.7em;
+            overflow-y: auto;
+            z-index: 50;
+            opacity: 0.8;
+        }
+        .debug-panel:hover { opacity: 1; }
+        .debug-panel .log-entry { padding: 2px 8px; border-bottom: 1px solid #1a1a1a; }
+        .log-error { color: #e74c3c; }
+        .log-success { color: #27ae60; }
+        .log-info { color: #3498db; }
+    </style>
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <h2>Rocket.Chat Login</h2>
+            <input type="text" id="username" placeholder="Username" value="alice">
+            <input type="password" id="password" placeholder="Password" value="alice123">
+            <button onclick="login()">LOGIN</button>
+            <p style="margin-top: 15px; font-size: 0.8em; color: #888;">
+                Users: alice, bob, charlie, testadmin<br>
+                Password: [username]123
+            </p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <h1>Rocket.Chat Client - <span id="logged-user">Not logged in</span></h1>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>Channels</h3>
+                <div id="channels-list">
+                    <div class="room-item active" data-room="GENERAL" data-type="channel">
+                        # general
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Direct Messages</h3>
+                <div id="dm-list"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Users (click to DM)</h3>
+                <div id="users-list"></div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <span id="current-room-name">#general</span>
+            </div>
+
+            <div id="messages"></div>
+
+            <div class="input-area">
+                <button class="btn-voice" id="btn-voice" onclick="toggleRecording()" title="Record voice message">
+                    🎤
+                </button>
+                <input type="text" id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
+                <button class="btn-send" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-bar">Disconnected</div>
+
+    <!-- Debug Panel -->
+    <div class="debug-panel" id="debug-panel"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
